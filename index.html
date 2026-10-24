@@ -83,6 +83,33 @@
   footer { color: var(--muted); font-size: 12px; padding: 18px 16px 28px; text-align: center;
     border-top: 1px solid var(--line); }
   footer a { color: var(--muted); }
+  /* Place picker */
+  .placebtn { background: none; border: 0; color: inherit; font: inherit; text-align: left;
+    padding: 0; cursor: pointer; min-width: 0; flex: 1; }
+  .placebtn h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .placebtn .caret { font-size: 14px; color: var(--accent); }
+  .hbtns { display: flex; flex-shrink: 0; }
+  #favbtn { color: var(--muted); font-size: 24px; }
+  #favbtn.on { color: #f2c94c; }
+  #searchbtn { font-size: 19px; }
+  .sheet { position: fixed; inset: 0; z-index: 1100; background: var(--bg); overflow-y: auto;
+    padding-top: env(safe-area-inset-top); }
+  .sheethead { display: flex; gap: 8px; padding: 12px 12px 8px 16px; position: sticky; top: 0; background: var(--bg); }
+  .sheethead input { flex: 1; min-width: 0; font: inherit; font-size: 17px; color: var(--text);
+    background: var(--band); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; outline: none; }
+  .sheethead input:focus { border-color: var(--accent); }
+  .sheethead button { background: none; border: 0; color: var(--text); font-size: 20px; padding: 0 8px; cursor: pointer; }
+  .sheet h3 { margin: 18px 16px 6px; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; }
+  .prow { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 0;
+    border-top: 1px solid var(--line); color: var(--text); font: inherit; text-align: left; padding: 12px 16px; cursor: pointer; }
+  .prow .pn { font-size: 16px; font-weight: 600; }
+  .prow .pa { font-size: 13px; color: var(--muted); }
+  .prow .grow { flex: 1; min-width: 0; }
+  .prow .del { background: none; border: 0; color: var(--muted); font-size: 18px; padding: 4px 8px; cursor: pointer; }
+  .prow.cur .pn::after { content: ' ✓'; color: var(--accent); }
+  .prow.gps { color: var(--accent); font-weight: 600; }
+  .hint { padding: 10px 16px; color: var(--muted); font-size: 14px; }
+
   /* Bottom tab bar */
   body { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
   nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; display: flex;
@@ -129,11 +156,15 @@
 <body>
 <div id="view-saa">
 <header>
-  <div>
-    <h1 id="place">Sää</h1>
+  <button class="placebtn" id="placebtn" aria-label="Vaihda paikkaa">
+    <h1><span id="place">Sää</span> <span class="caret">▾</span></h1>
     <div class="sub" id="updated">Haetaan ennustetta…</div>
+  </button>
+  <div class="hbtns">
+    <button id="favbtn" aria-label="Lisää suosikkeihin">☆</button>
+    <button id="searchbtn" aria-label="Hae paikkaa">🔍</button>
+    <button id="refresh" aria-label="Päivitä">⟳</button>
   </div>
-  <button id="refresh" aria-label="Päivitä">⟳</button>
 </header>
 <main id="app"></main>
 <footer>Ennuste: <a href="https://www.ilmatieteenlaitos.fi/">Ilmatieteen laitos</a> (avoin data, CC BY 4.0) · Kuvakkeet: <a href="https://github.com/metno/weathericons">MET Norway</a></footer>
@@ -151,6 +182,17 @@
   </div>
 </div>
 
+<div id="places" class="sheet" hidden>
+  <div class="sheethead">
+    <input id="q" type="search" placeholder="Hae paikkaa, esim. Turku" autocomplete="off" enterkeyhint="search">
+    <button id="closeplaces" aria-label="Sulje">✕</button>
+  </div>
+  <button class="prow gps" id="gps">📍 <span>Nykyinen sijainti</span></button>
+  <div id="results"></div>
+  <h3>Suosikit</h3>
+  <div id="favs"></div>
+</div>
+
 <nav>
   <button data-tab="saa" class="active"><span class="ic">🌤️</span>Sää</button>
   <button data-tab="radar"><span class="ic">📡</span>Sadetutka</button>
@@ -159,11 +201,13 @@
 <script>
 // Location: ?lat=..&lon=.. once in the link, then remembered on the device. The default is
 // central Helsinki on purpose — this file is public, so no home coordinates live in the code.
-const { LAT, LON } = (() => {
+// FMI's edited forecast covers the Nordics + Baltics only
+const inCoverage = (lat, lon) => lat >= 54 && lat <= 72 && lon >= 4 && lon <= 35;
+const { LAT, LON, NAME } = (() => {
   const q = new URLSearchParams(location.search);
   const lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
-  if (lat >= 59 && lat <= 71 && lon >= 19 && lon <= 32) {
-    const loc = { LAT: +lat.toFixed(2), LON: +lon.toFixed(2) };
+  if (inCoverage(lat, lon)) {
+    const loc = { LAT: +lat.toFixed(2), LON: +lon.toFixed(2), NAME: q.get('nimi') || null };
     try { localStorage.setItem('saa_loc', JSON.stringify(loc)); } catch (_) {}
     return loc;
   }
@@ -171,7 +215,7 @@ const { LAT, LON } = (() => {
     const saved = JSON.parse(localStorage.getItem('saa_loc'));
     if (saved && saved.LAT) return saved;
   } catch (_) {}
-  return { LAT: 60.17, LON: 24.94 };
+  return { LAT: 60.17, LON: 24.94, NAME: 'Helsinki' };
 })();
 const DAYS = 11;
 const PARAMS = ['Temperature', 'WeatherSymbol3', 'PoP', 'Precipitation1h', 'WindSpeedMS', 'WindDirection', 'FeelsLike'];
@@ -274,7 +318,9 @@ function summarizeRain(hours) {
 
 function render(data) {
   const app = document.getElementById('app');
-  document.getElementById('place').textContent = data.place || 'Sää';
+  placeName = NAME || data.place || 'Sää';
+  document.getElementById('place').textContent = placeName;
+  updateFavBtn();
   const f = new Date(data.fetched);
   document.getElementById('updated').textContent =
     `Päivitetty ${f.getDate()}.${f.getMonth() + 1}. klo ${f.getHours()}.${pad(f.getMinutes())}`;
@@ -394,6 +440,123 @@ document.addEventListener('visibilitychange', () => {
     const c = JSON.parse(localStorage.getItem(CACHE_KEY));
     if (!c || Date.now() - c.fetched > 15 * 60000) load();
   } catch (_) { load(); }
+});
+
+// ---------- Places: search (Open-Meteo geocoding), favourites, GPS ----------
+// Function declarations + var: render() runs from the cached forecast before this section executes
+var placeName;
+function loadFavs() { try { return JSON.parse(localStorage.getItem('saa_favs')) || []; } catch (_) { return []; } }
+function saveFavs(f) { try { localStorage.setItem('saa_favs', JSON.stringify(f)); } catch (_) {} }
+function samePlace(a, b) { return Math.abs(a.lat - b.lat) < 0.005 && Math.abs(a.lon - b.lon) < 0.005; }
+function here() { return { lat: LAT, lon: LON }; }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function updateFavBtn() {
+  const on = loadFavs().some(f => samePlace(f, here()));
+  const b = document.getElementById('favbtn');
+  b.textContent = on ? '★' : '☆';
+  b.classList.toggle('on', on);
+  b.setAttribute('aria-label', on ? 'Poista suosikeista' : 'Lisää suosikkeihin');
+}
+
+document.getElementById('favbtn').addEventListener('click', () => {
+  let favs = loadFavs();
+  if (favs.some(f => samePlace(f, here()))) favs = favs.filter(f => !samePlace(f, here()));
+  else favs.push({ name: placeName || NAME || 'Paikka', lat: LAT, lon: LON });
+  saveFavs(favs);
+  updateFavBtn();
+});
+
+// Switch place: store it and reload cleanly (drops any ?lat&lon from the address)
+function setPlace(lat, lon, name) {
+  try { localStorage.setItem('saa_loc', JSON.stringify({ LAT: +lat.toFixed(2), LON: +lon.toFixed(2), NAME: name || null })); } catch (_) {}
+  location.replace(location.pathname);
+}
+
+function renderFavs() {
+  const favs = loadFavs();
+  document.getElementById('favs').innerHTML = favs.length
+    ? favs.map((f, i) => `<div class="prow${samePlace(f, here()) ? ' cur' : ''}" data-fav="${i}">
+        <div class="grow"><div class="pn">${esc(f.name)}</div></div>
+        <button class="del" data-del="${i}" aria-label="Poista">✕</button></div>`).join('')
+    : '<div class="hint">Ei suosikkeja vielä. Lisää paikka tähdellä ☆ yläpalkissa.</div>';
+}
+
+function openPlaces() {
+  renderFavs();
+  document.getElementById('results').innerHTML = '';
+  document.getElementById('q').value = '';
+  document.getElementById('places').hidden = false;
+  setTimeout(() => document.getElementById('q').focus(), 50);
+}
+const closePlaces = () => { document.getElementById('places').hidden = true; };
+document.getElementById('placebtn').addEventListener('click', openPlaces);
+document.getElementById('searchbtn').addEventListener('click', openPlaces);
+document.getElementById('closeplaces').addEventListener('click', closePlaces);
+
+document.getElementById('favs').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  const favs = loadFavs();
+  if (del) {
+    favs.splice(+del.dataset.del, 1);
+    saveFavs(favs);
+    renderFavs();
+    updateFavBtn();
+    return;
+  }
+  const row = e.target.closest('[data-fav]');
+  if (row) { const f = favs[+row.dataset.fav]; setPlace(f.lat, f.lon, f.name); }
+});
+
+let searchTimer = null, searchSeq = 0, results = [];
+document.getElementById('q').addEventListener('input', e => {
+  clearTimeout(searchTimer);
+  const q = e.target.value.trim();
+  if (q.length < 2) { document.getElementById('results').innerHTML = ''; return; }
+  searchTimer = setTimeout(() => searchPlaces(q), 300);
+});
+
+async function searchPlaces(q) {
+  const seq = ++searchSeq;
+  const box = document.getElementById('results');
+  try {
+    const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=20&language=fi&format=json`);
+    const d = await res.json();
+    if (seq !== searchSeq) return;  // a newer search already started
+    results = (d.results || [])
+      .filter(r => inCoverage(r.latitude, r.longitude))
+      .sort((a, b) => (b.country_code === 'FI') - (a.country_code === 'FI'))
+      .slice(0, 10);
+    box.innerHTML = results.length ? '<h3>Hakutulokset</h3>' + results.map((r, i) => {
+      // e.g. "Tapiola" — "Espoo, Uusimaa"; foreign places also get the country
+      const parts = [r.admin3 !== r.name ? r.admin3 : null, r.admin1, r.country_code !== 'FI' ? r.country : null].filter(Boolean);
+      return `<button class="prow" data-res="${i}"><div class="grow"><div class="pn">${esc(r.name)}</div>
+        <div class="pa">${esc(parts.join(', '))}</div></div></button>`;
+    }).join('') : '<div class="hint">Ei tuloksia. Ennuste on saatavilla Pohjoismaihin ja Baltiaan.</div>';
+  } catch (_) {
+    if (seq === searchSeq) box.innerHTML = '<div class="hint">Haku epäonnistui.</div>';
+  }
+}
+
+document.getElementById('results').addEventListener('click', e => {
+  const row = e.target.closest('[data-res]');
+  if (!row) return;
+  const r = results[+row.dataset.res];
+  setPlace(r.latitude, r.longitude, r.name);
+});
+
+document.getElementById('gps').addEventListener('click', () => {
+  const label = document.querySelector('#gps span');
+  if (!navigator.geolocation) { label.textContent = 'Sijainti ei ole käytettävissä'; return; }
+  label.textContent = 'Haetaan sijaintia…';
+  navigator.geolocation.getCurrentPosition(
+    p => {
+      if (!inCoverage(p.coords.latitude, p.coords.longitude)) { label.textContent = 'Ei ennustetta tälle sijainnille'; return; }
+      setPlace(p.coords.latitude, p.coords.longitude, null);  // FMI names the nearest place
+    },
+    err => { label.textContent = err.code === 1 ? 'Sijaintilupa evätty' : 'Sijaintia ei saatu'; },
+    { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
+  );
 });
 
 // ---------- Tabs ----------
