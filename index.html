@@ -110,6 +110,32 @@
   .prow.gps { color: var(--accent); font-weight: 600; }
   .hint { padding: 10px 16px; color: var(--muted); font-size: 14px; }
 
+  /* Warnings */
+  :root { --w-yellow: #f2c94c; --w-orange: #f39a3d; --w-red: #e5534b; }
+  #warnbanner { display: flex; align-items: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px 10px;
+    padding: 7px 12px; border: 0; border-left: 4px solid var(--wc); border-radius: 8px; cursor: pointer;
+    background: color-mix(in srgb, var(--wc) 18%, var(--band)); color: var(--text); font: inherit; font-size: 14px; text-align: left; }
+  #warnbanner .wt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #warnbanner .more { color: var(--muted); font-size: 13px; flex-shrink: 0; }
+  .badge { display: inline-block; min-width: 16px; padding: 0 4px; margin-left: 4px; border-radius: 8px;
+    background: var(--w-orange); color: #1b1b1b; font-size: 11px; font-weight: 700; line-height: 16px; }
+  .wsec { margin: 14px 16px 6px; font-size: 14px; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+  .wcard { margin: 0 12px 10px; padding: 12px 14px; border-radius: 10px; background: var(--band);
+    border-left: 5px solid var(--wc); }
+  .wcard .wh { display: flex; gap: 8px; align-items: baseline; font-weight: 700; font-size: 16px; }
+  .wcard .wtime { color: var(--muted); font-size: 13px; margin-top: 3px; }
+  .wcard .wtime .nowchip { color: #1b1b1b; background: var(--wc); border-radius: 6px; padding: 0 6px; font-weight: 700; margin-right: 6px; }
+  .wcard .wdesc { margin-top: 8px; font-size: 15px; line-height: 1.4; }
+  .wcard .wimp { margin-top: 6px; font-size: 13px; color: var(--muted); font-style: italic; }
+  .wcard .warea { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .wrow { display: flex; gap: 10px; align-items: center; width: 100%; background: none; border: 0;
+    border-top: 1px solid var(--line); color: var(--text); font: inherit; text-align: left; padding: 10px 16px; cursor: pointer; }
+  .wrow .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--wc); flex-shrink: 0; }
+  .wrow .grow { flex: 1; min-width: 0; font-size: 14px; }
+  .wrow .grow small { display: block; color: var(--muted); font-size: 12px; }
+  .wrow + .wcard { margin-top: 6px; }
+  .wok { margin: 4px 16px 10px; padding: 12px 14px; border-radius: 10px; background: var(--band); color: var(--muted); }
+
   /* Bottom tab bar */
   body { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
   nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; display: flex;
@@ -166,8 +192,15 @@
     <button id="refresh" aria-label="Päivitä">⟳</button>
   </div>
 </header>
+<button id="warnbanner" hidden></button>
 <main id="app"></main>
 <footer>Ennuste: <a href="https://www.ilmatieteenlaitos.fi/">Ilmatieteen laitos</a> (avoin data, CC BY 4.0) · Kuvakkeet: <a href="https://github.com/metno/weathericons">MET Norway</a></footer>
+</div>
+
+<div id="view-warn" hidden>
+  <header><div><h1>Varoitukset</h1><div class="sub" id="warnplace"></div></div></header>
+  <div id="warnlist"><div class="hint">Haetaan varoituksia…</div></div>
+  <footer>Varoitukset: <a href="https://www.ilmatieteenlaitos.fi/varoitukset">Ilmatieteen laitos</a> · <span id="warnupdated"></span></footer>
 </div>
 
 <div id="view-radar" hidden>
@@ -196,6 +229,7 @@
 <nav>
   <button data-tab="saa" class="active"><span class="ic">🌤️</span>Sää</button>
   <button data-tab="radar"><span class="ic">📡</span>Sadetutka</button>
+  <button data-tab="warn"><span class="ic">⚠️</span><span>Varoitukset<span class="badge" id="warnbadge" hidden></span></span></button>
 </nav>
 
 <script>
@@ -320,6 +354,7 @@ function render(data) {
   const app = document.getElementById('app');
   placeName = NAME || data.place || 'Sää';
   document.getElementById('place').textContent = placeName;
+  document.getElementById('warnplace').textContent = placeName;
   updateFavBtn();
   const f = new Date(data.fetched);
   document.getElementById('updated').textContent =
@@ -578,10 +613,124 @@ document.getElementById('gps').addEventListener('click', () => {
   );
 });
 
+// ---------- Weather warnings ----------
+// Built from FMI's CAP feed every 15 min by a GitHub Action (the feed itself has no CORS),
+// read from the GitHub Pages copy by both the Pages and the HA-hosted app.
+const WARN_URL = 'https://reijar.github.io/saa/warnings.json';
+const WARN_ICON = {
+  wind: '💨', seaWind: '⛵', seaWaveHeight: '🌊', thunderStorm: '⛈️', rain: '🌧️',
+  forestFireWeather: '🔥', grassFireWeather: '🔥', trafficWeather: '🚗', pedestrianSafety: '🚶',
+  hotWeather: '🥵', coldWeather: '🥶', uvNote: '☀️', seaIcing: '🧊', flooding: '💧',
+  seaWaterHeightHighWater: '🌊', seaWaterHeightShallowWater: '⚓',
+};
+const WARN_RANK = { red: 3, orange: 2, yellow: 1 };
+let warnData = null, warnFetched = 0;
+
+function pointInPolygon(lat, lon, poly) {
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [yi, xi] = poly[i], [yj, xj] = poly[j];
+    if ((xi > lon) !== (xj > lon) && lat < (yj - yi) * (lon - xi) / (xj - xi) + yi) inside = !inside;
+  }
+  return inside;
+}
+const coversHere = w => w.areas.some(a => a.polygons.some(p => pointInPolygon(LAT, LON, p)));
+const wColor = w => `var(--w-${WARN_RANK[w.color] ? w.color : 'yellow'})`;
+// "Keltainen tuulivaroitus maa-alueille: Kymenlaakso…, su 8.00 - ma 14.00" → title / areas
+const wTitle = w => (w.headline || w.event).split(':')[0];
+const wAreas = w => (w.headline.split(':')[1] || '').replace(/,\s*[a-z]{2} \d.*$/, '').trim();
+const wShort = w => wTitle(w).replace(/ (maa-alueille|merelle)$/, '');
+
+function wTime(w) {
+  const f = iso => {
+    const d = new Date(iso);
+    return `${WD[d.getDay()].toLowerCase()} ${d.getDate()}.${d.getMonth() + 1}. klo ${d.getHours()}${d.getMinutes() ? '.' + pad(d.getMinutes()) : ''}`;
+  };
+  return `${f(w.onset)} – ${f(w.expires)}`;
+}
+const isActive = w => new Date(w.onset) <= Date.now();
+
+function wCard(w) {
+  return `<div class="wcard" style="--wc:${wColor(w)}">
+    <div class="wh"><span>${WARN_ICON[w.type] || '⚠️'}</span><span>${esc(wTitle(w))}</span></div>
+    <div class="wtime">${isActive(w) ? '<span class="nowchip">Voimassa</span>' : ''}${wTime(w)}</div>
+    ${w.description ? `<div class="wdesc">${esc(w.description)}</div>` : ''}
+    ${w.impacts ? `<div class="wimp">${esc(w.impacts)}</div>` : ''}
+    ${wAreas(w) ? `<div class="warea">Alue: ${esc(wAreas(w))}</div>` : ''}
+  </div>`;
+}
+
+function renderWarnings() {
+  if (!warnData) return;
+  const all = warnData.warnings.filter(w => new Date(w.expires) > Date.now());
+  const local = all.filter(coversHere)
+    .sort((a, b) => (WARN_RANK[b.color] || 0) - (WARN_RANK[a.color] || 0) || new Date(a.onset) - new Date(b.onset));
+  const others = all.filter(w => !local.includes(w));
+
+  // Compact one-line banner on the forecast page
+  const banner = document.getElementById('warnbanner');
+  banner.hidden = !local.length;
+  if (local.length) {
+    const top = local[0];
+    banner.style.setProperty('--wc', wColor(top));
+    banner.innerHTML = `<span>${WARN_ICON[top.type] || '⚠️'}</span>
+      <span class="wt"><b>${esc(wShort(top))}</b> · ${isActive(top) ? 'voimassa nyt' : wTime(top).split(' – ')[0]}</span>
+      ${local.length > 1 ? `<span class="more">+${local.length - 1}</span>` : ''}<span class="more">›</span>`;
+  }
+  const badge = document.getElementById('warnbadge');
+  badge.hidden = !local.length;
+  badge.textContent = local.length;
+
+  document.getElementById('warnplace').textContent = placeName || NAME || '';
+  document.getElementById('warnlist').innerHTML =
+    `<div class="wsec">Alueellasi</div>` +
+    (local.length ? local.map(wCard).join('') : '<div class="wok">✓ Ei varoituksia tällä paikalla.</div>') +
+    (others.length ? `<div class="wsec">Muualla (${others.length})</div>` + others.map((w, i) =>
+      `<button class="wrow" data-w="${i}" style="--wc:${wColor(w)}"><span class="dot"></span>
+        <span class="grow">${WARN_ICON[w.type] || '⚠️'} ${esc(wTitle(w))}<small>${esc(wAreas(w))} · ${wTime(w)}</small></span></button>`
+    ).join('') : '');
+  document.getElementById('warnlist').onclick = e => {
+    const row = e.target.closest('.wrow');
+    if (!row) return;
+    const next = row.nextElementSibling;
+    if (next && next.classList.contains('wcard')) next.remove();
+    else row.insertAdjacentHTML('afterend', wCard(others[+row.dataset.w]));
+  };
+  const u = new Date(warnData.updated);
+  const stale = Date.now() - u > 2 * 3600000;
+  document.getElementById('warnupdated').textContent =
+    `päivitetty ${u.getDate()}.${u.getMonth() + 1}. klo ${u.getHours()}.${pad(u.getMinutes())}${stale ? ' (tiedot voivat olla vanhoja)' : ''}`;
+}
+
+async function loadWarnings() {
+  try {
+    const res = await fetch(`${WARN_URL}?t=${Math.floor(Date.now() / 300000)}`, { cache: 'no-store' });
+    if (!res.ok) throw new Error(res.status);
+    warnData = await res.json();
+    warnFetched = Date.now();
+    try { localStorage.setItem('saa_warnings', JSON.stringify(warnData)); } catch (_) {}
+  } catch (_) {
+    if (!warnData) {
+      try { warnData = JSON.parse(localStorage.getItem('saa_warnings')); } catch (_) {}
+      if (!warnData) document.getElementById('warnlist').innerHTML = '<div class="wok">Varoitusten haku epäonnistui.</div>';
+    }
+  }
+  renderWarnings();
+}
+
+document.getElementById('warnbanner').addEventListener('click', () => showTab('warn'));
+document.getElementById('refresh').addEventListener('click', loadWarnings);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && Date.now() - warnFetched > 10 * 60000) loadWarnings();
+});
+loadWarnings();
+
 // ---------- Tabs ----------
 function showTab(tab) {
   document.getElementById('view-saa').hidden = tab !== 'saa';
   document.getElementById('view-radar').hidden = tab !== 'radar';
+  document.getElementById('view-warn').hidden = tab !== 'warn';
+  window.scrollTo(0, 0);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   try { sessionStorage.setItem('saa_tab', tab); } catch (_) {}
   if (tab === 'radar') openRadar(); else stopRadar();
@@ -746,7 +895,10 @@ async function openRadar() {
 document.getElementById('rplay').addEventListener('click', () => (playTimer ? stopRadar() : play()));
 document.getElementById('rslider').addEventListener('input', e => { stopRadar(); showFrame(+e.target.value); });
 
-try { if (location.hash === '#tutka' || sessionStorage.getItem('saa_tab') === 'radar') showTab('radar'); } catch (_) {}
+try {
+  const t = location.hash === '#tutka' ? 'radar' : location.hash === '#varoitukset' ? 'warn' : sessionStorage.getItem('saa_tab');
+  if (t === 'radar' || t === 'warn') showTab(t);
+} catch (_) {}
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
