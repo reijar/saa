@@ -545,14 +545,30 @@ document.getElementById('results').addEventListener('click', e => {
   setPlace(r.latitude, r.longitude, r.name);
 });
 
+// "Saunalahti, Espoo" from OpenStreetMap. FMI's own nearest-place name can be an obscure
+// locality or a Swedish-only name (e.g. "Tvijälp"), so it's only the fallback (null).
+async function districtName(lat, lon) {
+  try {
+    const ctl = new AbortController();
+    setTimeout(() => ctl.abort(), 5000);
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat.toFixed(3)}&lon=${lon.toFixed(3)}&zoom=14&accept-language=fi`, { signal: ctl.signal });
+    const a = (await res.json()).address || {};
+    const parts = [a.suburb || a.village || a.hamlet, a.city || a.town || a.village];
+    return [...new Set(parts.filter(Boolean))].join(', ') || null;
+  } catch (_) {
+    return null;
+  }
+}
+
 document.getElementById('gps').addEventListener('click', () => {
   const label = document.querySelector('#gps span');
   if (!navigator.geolocation) { label.textContent = 'Sijainti ei ole käytettävissä'; return; }
   label.textContent = 'Haetaan sijaintia…';
   navigator.geolocation.getCurrentPosition(
-    p => {
-      if (!inCoverage(p.coords.latitude, p.coords.longitude)) { label.textContent = 'Ei ennustetta tälle sijainnille'; return; }
-      setPlace(p.coords.latitude, p.coords.longitude, null);  // FMI names the nearest place
+    async p => {
+      const { latitude: lat, longitude: lon } = p.coords;
+      if (!inCoverage(lat, lon)) { label.textContent = 'Ei ennustetta tälle sijainnille'; return; }
+      setPlace(lat, lon, await districtName(lat, lon));
     },
     err => { label.textContent = err.code === 1 ? 'Sijaintilupa evätty' : 'Sijaintia ei saatu'; },
     { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 }
