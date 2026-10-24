@@ -113,7 +113,7 @@
 
   /* Warnings */
   :root { --w-yellow: #f2c94c; --w-orange: #f39a3d; --w-red: #e5534b; }
-  #warnbanner { display: flex; align-items: center; gap: 8px; width: calc(100% - 32px); margin: 0 16px 10px;
+  #warnbanner { display: flex; align-items: center; gap: 8px; width: calc(100% - 32px); margin: -4px 16px 14px;
     padding: 7px 12px; border: 0; border-left: 4px solid var(--wc); border-radius: 8px; cursor: pointer;
     background: color-mix(in srgb, var(--wc) 18%, var(--band)); color: var(--text); font: inherit; font-size: 14px; text-align: left; }
   #warnbanner .wt { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -389,6 +389,7 @@ function render(data) {
     </section>
     <div class="band"><h2>Sademäärä 24 t</h2></div>
     <div class="rain">${summarizeRain(data.hours)}</div>
+    <div id="warnslot"></div>
     <div class="band"><h2>Ennuste</h2><span>Ilmatieteen laitos</span></div>`;
 
   for (const day of days) {
@@ -430,7 +431,10 @@ function render(data) {
       }).join('')}</div>
     </section>`;
   }
+  // The warning banner lives below the rain summary; carry the element across re-renders
+  const banner = document.getElementById('warnbanner');
   app.innerHTML = html;
+  document.getElementById('warnslot').appendChild(banner);
 }
 
 document.getElementById('app').addEventListener('click', e => {
