@@ -1,0 +1,12 @@
+{
+  "name": "Sää",
+  "short_name": "Sää",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#1b3049",
+  "theme_color": "#1b3049",
+  "icons": [
+    { "src": "icons/partlycloudy_day.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

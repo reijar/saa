@@ -1,0 +1,572 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1b3049">
+<title>Sää</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/partlycloudy_day.svg">
+<style>
+  :root {
+    --bg: #1b3049;
+    --band: #142538;
+    --line: #2a4562;
+    --text: #f2f6fa;
+    --muted: #9fb3c8;
+    --accent: #4fb3e0;
+    --warm: #f39a3d;
+    --hot: #e5534b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-tap-highlight-color: transparent; }
+  body { padding-bottom: env(safe-area-inset-bottom); }
+  header { display: flex; align-items: center; justify-content: space-between;
+    padding: calc(14px + env(safe-area-inset-top)) 16px 12px; }
+  header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .3px; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  header button { background: none; border: 0; color: var(--text); font-size: 22px;
+    padding: 6px 8px; cursor: pointer; border-radius: 8px; }
+  header button.spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .now { display: flex; align-items: center; gap: 12px; padding: 4px 16px 16px; }
+  .now img { width: 84px; height: 84px; }
+  .now .t { font-size: 56px; font-weight: 300; line-height: 1; }
+  .now .d { color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .now .d b { color: var(--text); font-weight: 600; }
+
+  .band { background: var(--band); padding: 12px 16px; display: flex;
+    justify-content: space-between; align-items: baseline; border-top: 1px solid var(--line); }
+  .band h2 { margin: 0; font-size: 17px; color: var(--accent); font-weight: 700; }
+  .band span { font-size: 12px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; }
+  .rain { padding: 14px 16px; border-top: 1px solid var(--line); font-size: 16px; line-height: 1.4; }
+
+  .day { border-top: 1px solid var(--line); }
+  .dayrow { display: grid; grid-template-columns: 56px 50px minmax(0,1fr) auto 34px 22px;
+    align-items: center; gap: 6px; padding: 12px 10px 12px 16px; cursor: pointer;
+    width: 100%; background: none; border: 0; color: inherit; font: inherit; text-align: left; }
+  .dayrow .wd { font-weight: 700; font-size: 17px; }
+  .dayrow .dt { font-size: 14px; color: var(--muted); }
+  .dayrow img { width: 50px; height: 50px; }
+  .temps .hi { font-size: 22px; font-weight: 700; }
+  .temps .lo { font-size: 17px; color: var(--muted); font-weight: 600; margin-left: 6px; white-space: nowrap; }
+  .temps .lo small { font-size: 11px; font-weight: 400; }
+  .pr { font-size: 13px; line-height: 1.35; color: var(--text); white-space: nowrap; }
+  .chev { width: 22px; height: 22px; stroke: var(--accent); fill: none; stroke-width: 2.5;
+    transition: transform .2s; }
+  .day.open .chev { transform: rotate(180deg); }
+  .day.open .dayrow { background: var(--band); }
+
+  .hours { display: none; background: #172a40; }
+  .day.open .hours { display: block; }
+  .hour { display: grid; grid-template-columns: 46px 38px 92px minmax(0,1fr) 34px;
+    align-items: center; gap: 6px; padding: 6px 12px 6px 16px; border-top: 1px solid #22394f; }
+  .hour .h { color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .hour img { width: 38px; height: 38px; }
+  .hour .tt { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 7px; }
+  .fl { display: inline-flex; flex-direction: column; font-size: 11px; line-height: 1.15;
+    color: var(--muted); font-weight: 400; }
+  .fl b { font-size: 14px; font-weight: 600; color: #c9d6e3; }
+  .now .tw { display: flex; align-items: center; gap: 10px; }
+  .now .fl { font-size: 12px; }
+  .now .fl b { font-size: 22px; }
+  .hour .desc { font-size: 13px; color: var(--muted); line-height: 1.3; }
+  .hour .desc b { color: var(--text); font-weight: 500; }
+  .hour.past { opacity: .45; }
+
+  .wind { width: 34px; height: 34px; display: block; }
+  .wind text { font-size: 13px; font-weight: 700; fill: currentColor; }
+
+  footer { color: var(--muted); font-size: 12px; padding: 18px 16px 28px; text-align: center;
+    border-top: 1px solid var(--line); }
+  footer a { color: var(--muted); }
+  /* Bottom tab bar */
+  body { padding-bottom: calc(62px + env(safe-area-inset-bottom)); }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000; display: flex;
+    background: #1f3a58; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; background: none; border: 0; color: var(--muted); font: inherit; font-size: 13px;
+    padding: 8px 0 9px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  nav button .ic { font-size: 21px; line-height: 1; filter: grayscale(1) brightness(1.6); opacity: .8; }
+  nav button.active { color: var(--text); font-weight: 700; }
+  nav button.active .ic { filter: none; opacity: 1; }
+  [hidden] { display: none !important; }
+
+  /* Radar */
+  #view-radar { position: fixed; top: 0; left: 0; right: 0; bottom: calc(62px + env(safe-area-inset-bottom)); }
+  #map { position: absolute; inset: 0; background: #0e1a27; }
+  .rbar { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 500;
+    background: rgba(20, 37, 56, .92); border-radius: 12px; padding: 10px 12px;
+    display: grid; grid-template-columns: 44px 1fr; gap: 4px 10px; align-items: center; }
+  .rbar button { grid-row: 2 / 4; grid-column: 1; width: 44px; height: 44px; border-radius: 50%; border: 0;
+    background: var(--accent); color: #0d2033; font-size: 17px; cursor: pointer; }
+  .rbar .rt, .rbar input { grid-column: 2; }
+  .rbar .rt { font-size: 15px; font-weight: 700; display: flex; justify-content: space-between; }
+  .rbar .rt span { color: var(--muted); font-weight: 400; font-size: 13px; }
+  .rbar input { width: 100%; accent-color: var(--accent); margin: 0; }
+  .nc { grid-column: 1 / 3; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 4px; }
+  .nc .ttl { font-size: 13px; display: flex; justify-content: space-between; }
+  .nc .ttl span { color: var(--muted); }
+  .nc .bars { display: flex; align-items: flex-end; gap: 2px; height: 36px; margin-top: 6px; }
+  .nc .bars div { flex: 1; background: var(--accent); border-radius: 2px 2px 0 0; min-height: 1px; opacity: .9; }
+  .nc .bars div.zero { background: var(--line); }
+  .nc .ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .rtitle, .legend { position: absolute; top: calc(10px + env(safe-area-inset-top)); z-index: 500;
+    background: rgba(20, 37, 56, .92); border-radius: 10px; padding: 8px 12px; }
+  .rtitle { left: 10px; font-weight: 700; font-size: 15px; }
+  .legend { right: 10px; font-size: 11px; color: var(--muted); padding: 7px 10px; }
+  .legend .grad { width: 120px; height: 8px; border-radius: 4px; margin: 3px 0 2px;
+    background: linear-gradient(90deg, #8fe3f2, #3fbf6f, #1f8f3f, #f2e14b, #f39a3d, #e5302b, #b0207a); }
+  .legend .lbl { display: flex; justify-content: space-between; }
+  .leaflet-control-attribution { font-size: 9px; background: rgba(20, 37, 56, .7) !important; color: var(--muted); }
+  .leaflet-control-attribution a { color: var(--muted); }
+  .leaflet-bottom.leaflet-right { bottom: auto; top: calc(76px + env(safe-area-inset-top)); }
+  .err { margin: 16px; padding: 12px; border-radius: 8px; background: #4a2330; font-size: 14px; }
+</style>
+</head>
+<body>
+<div id="view-saa">
+<header>
+  <div>
+    <h1 id="place">Sää</h1>
+    <div class="sub" id="updated">Haetaan ennustetta…</div>
+  </div>
+  <button id="refresh" aria-label="Päivitä">⟳</button>
+</header>
+<main id="app"></main>
+<footer>Ennuste: <a href="https://www.ilmatieteenlaitos.fi/">Ilmatieteen laitos</a> (avoin data, CC BY 4.0) · Kuvakkeet: <a href="https://github.com/metno/weathericons">MET Norway</a></footer>
+</div>
+
+<div id="view-radar" hidden>
+  <div id="map"></div>
+  <div class="rtitle">Sadetutka</div>
+  <div class="legend">Sateen voimakkuus<div class="grad"></div><div class="lbl"><span>heikko</span><span>rankka</span></div></div>
+  <div class="rbar">
+    <div class="nc" id="nowcast" hidden></div>
+    <button id="rplay" aria-label="Toista">▶</button>
+    <div class="rt"><b id="rtime">Haetaan…</b><span id="rago"></span></div>
+    <input id="rslider" type="range" min="0" max="0" value="0" aria-label="Tutkakuvan aika">
+  </div>
+</div>
+
+<nav>
+  <button data-tab="saa" class="active"><span class="ic">🌤️</span>Sää</button>
+  <button data-tab="radar"><span class="ic">📡</span>Sadetutka</button>
+</nav>
+
+<script>
+// Location: ?lat=..&lon=.. once in the link, then remembered on the device. The default is
+// central Helsinki on purpose — this file is public, so no home coordinates live in the code.
+const { LAT, LON } = (() => {
+  const q = new URLSearchParams(location.search);
+  const lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
+  if (lat >= 59 && lat <= 71 && lon >= 19 && lon <= 32) {
+    const loc = { LAT: +lat.toFixed(2), LON: +lon.toFixed(2) };
+    try { localStorage.setItem('saa_loc', JSON.stringify(loc)); } catch (_) {}
+    return loc;
+  }
+  try {
+    const saved = JSON.parse(localStorage.getItem('saa_loc'));
+    if (saved && saved.LAT) return saved;
+  } catch (_) {}
+  return { LAT: 60.17, LON: 24.94 };
+})();
+const DAYS = 11;
+const PARAMS = ['Temperature', 'WeatherSymbol3', 'PoP', 'Precipitation1h', 'WindSpeedMS', 'WindDirection', 'FeelsLike'];
+const CACHE_KEY = `saa_forecast_${LAT}_${LON}`;
+
+const WD = ['SU', 'MA', 'TI', 'KE', 'TO', 'PE', 'LA'];
+
+// FMI WeatherSymbol3 → [met.no icon base, has day/night variant, Finnish description]
+const SYMBOLS = {
+  1: ['clearsky', 1, 'Selkeää'], 2: ['partlycloudy', 1, 'Puolipilvistä'], 3: ['cloudy', 0, 'Pilvistä'],
+  21: ['lightrainshowers', 1, 'Heikkoja sadekuuroja'], 22: ['rainshowers', 1, 'Sadekuuroja'],
+  23: ['heavyrainshowers', 1, 'Voimakkaita sadekuuroja'],
+  31: ['lightrain', 0, 'Heikkoa vesisadetta'], 32: ['rain', 0, 'Vesisadetta'], 33: ['heavyrain', 0, 'Voimakasta vesisadetta'],
+  41: ['lightsnowshowers', 1, 'Heikkoja lumikuuroja'], 42: ['snowshowers', 1, 'Lumikuuroja'],
+  43: ['heavysnowshowers', 1, 'Voimakkaita lumikuuroja'],
+  51: ['lightsnow', 0, 'Heikkoa lumisadetta'], 52: ['snow', 0, 'Lumisadetta'], 53: ['heavysnow', 0, 'Voimakasta lumisadetta'],
+  61: ['rainshowersandthunder', 1, 'Ukkoskuuroja'], 62: ['heavyrainshowersandthunder', 1, 'Voimakkaita ukkoskuuroja'],
+  63: ['rainandthunder', 0, 'Ukkosta'], 64: ['heavyrainandthunder', 0, 'Voimakasta ukkosta'],
+  71: ['lightsleetshowers', 1, 'Heikkoja räntäkuuroja'], 72: ['sleetshowers', 1, 'Räntäkuuroja'],
+  73: ['heavysleetshowers', 1, 'Voimakkaita räntäkuuroja'],
+  81: ['lightsleet', 0, 'Heikkoa räntäsadetta'], 82: ['sleet', 0, 'Räntäsadetta'], 83: ['heavysleet', 0, 'Voimakasta räntäsadetta'],
+  91: ['fog', 0, 'Utua'], 92: ['fog', 0, 'Sumua'],
+};
+
+// Sun elevation in degrees (NOAA approximation) — picks day/night icons
+function sunElevation(date, lat, lon) {
+  const rad = Math.PI / 180;
+  const d = date.getTime() / 86400000 + 2440587.5 - 2451545.0;
+  const g = (357.529 + 0.98560028 * d) * rad;
+  const q = 280.459 + 0.98564736 * d;
+  const L = (q + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+  const e = (23.439 - 0.00000036 * d) * rad;
+  const dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const ra = Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L)) / rad;
+  const gmst = (18.697374558 + 24.06570982441908 * d) % 24;
+  const ha = ((gmst * 15 + lon - ra) % 360) * rad;
+  return Math.asin(Math.sin(lat * rad) * Math.sin(dec) + Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+}
+
+function icon(sym, date) {
+  const s = SYMBOLS[sym] || SYMBOLS[3];
+  if (!s[1]) return `icons/${s[0]}.svg`;
+  return `icons/${s[0]}_${sunElevation(date, LAT, LON) > -0.8 ? 'day' : 'night'}.svg`;
+}
+const desc = sym => (SYMBOLS[sym] || ['', 0, ''])[2];
+
+const fmtT = t => (Math.round(t) > 0 ? '+' : '') + Math.round(t) + '°';
+const fmtMm = mm => mm.toFixed(1).replace('.', ',') + ' mm';
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+const feels = h => isNaN(h.FeelsLike) ? '' : `<span class="fl">tuntuu<b>${fmtT(h.FeelsLike)}</b></span>`;
+
+// Round badge whose point shows where the wind blows TO; number = m/s
+function windBadge(ms, fromDeg) {
+  const v = Math.round(ms);
+  const color = ms >= 14 ? 'var(--hot)' : ms >= 8 ? 'var(--warm)' : 'var(--text)';
+  const rot = (fromDeg + 180) % 360;
+  return `<svg class="wind" viewBox="0 0 34 34" style="color:${color}" role="img" aria-label="Tuuli ${v} m/s">
+    <g transform="rotate(${rot} 17 17)"><circle cx="17" cy="17" r="11" fill="none" stroke="currentColor" stroke-width="2"/>
+    <path d="M12.8 7.8 L17 1.5 L21.2 7.8" fill="currentColor" stroke="none"/></g>
+    <text x="17" y="21.5" text-anchor="middle">${v}</text></svg>`;
+}
+
+async function fetchForecast() {
+  const end = new Date(Date.now() + DAYS * 86400000).toISOString().slice(0, 13) + ':00:00Z';
+  const url = 'https://opendata.fmi.fi/wfs?service=WFS&version=2.0.0&request=getFeature' +
+    '&storedquery_id=fmi::forecast::edited::weather::scandinavia::point::multipointcoverage' +
+    `&latlon=${LAT},${LON}&parameters=${PARAMS.join(',')}&timestep=60&endtime=${end}`;
+  const res = await fetch(url, { cache: 'no-store' });
+  if (!res.ok) throw new Error('FMI ' + res.status);
+  const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+  const byLocal = (name) => [...xml.getElementsByTagName('*')].find(el => el.localName === name);
+  const positions = byLocal('positions').textContent.trim().split(/\n/);
+  const values = byLocal('doubleOrNilReasonTupleList').textContent.trim().split(/\n/);
+  const hours = positions.map((p, i) => {
+    const epoch = +p.trim().split(/\s+/)[2];
+    const v = values[i].trim().split(/\s+/).map(Number);
+    const o = { t: epoch * 1000 };
+    PARAMS.forEach((k, j) => { o[k] = v[j]; });
+    return o;
+  }).filter(h => !isNaN(h.Temperature));
+  // Place name sits on the gml:Point (the first gml:name in the doc is the region)
+  const name = [...xml.getElementsByTagName('*')].find(el => el.localName === 'name' && el.parentNode.localName === 'Point')?.textContent;
+  const region = byLocal('region')?.textContent;
+  return { fetched: Date.now(), place: [name, region].filter(Boolean).join(', '), hours };
+}
+
+function summarizeRain(hours) {
+  const now = Date.now();
+  const next = hours.filter(h => h.t >= now - 3600000 && h.t < now + 24 * 3600000);
+  const total = next.reduce((s, h) => s + (h.Precipitation1h || 0), 0);
+  const first = next.find(h => h.Precipitation1h >= 0.1);
+  if (!first || total < 0.1) return 'Ei sadetta seuraavan 24 tunnin aikana.';
+  const d = new Date(first.t);
+  const when = d.getTime() <= now ? 'Sataa nyt' :
+    `Sadetta odotettavissa ${dayKey(d) === dayKey(new Date()) ? '' : 'huomenna '}klo ${d.getHours()} alkaen`;
+  return `${when}, yhteensä noin ${fmtMm(total)} vuorokauden aikana.`;
+}
+
+function render(data) {
+  const app = document.getElementById('app');
+  document.getElementById('place').textContent = data.place || 'Sää';
+  const f = new Date(data.fetched);
+  document.getElementById('updated').textContent =
+    `Päivitetty ${f.getDate()}.${f.getMonth() + 1}. klo ${f.getHours()}.${pad(f.getMinutes())}`;
+
+  const now = Date.now();
+  const cur = data.hours.find(h => h.t + 3600000 > now) || data.hours[0];
+  const curDate = new Date(cur.t);
+
+  // Group hours by local calendar day
+  const days = [];
+  for (const h of data.hours) {
+    const d = new Date(h.t), k = dayKey(d);
+    if (!days.length || days[days.length - 1].key !== k) days.push({ key: k, date: d, hours: [] });
+    days[days.length - 1].hours.push(h);
+  }
+
+  const openKeys = new Set(JSON.parse(sessionStorage.getItem('saa_open') || 'null') ?? [dayKey(new Date())]);
+
+  let html = `
+    <section class="now">
+      <img src="${icon(cur.WeatherSymbol3, curDate)}" alt="">
+      <div class="tw">
+        <div class="t">${fmtT(cur.Temperature)}</div>
+        ${feels(cur)}
+      </div>
+      <div class="d">
+        <b>${desc(cur.WeatherSymbol3)}</b><br>
+        Tuuli ${Math.round(cur.WindSpeedMS)} m/s
+      </div>
+    </section>
+    <div class="band"><h2>Sademäärä 24 t</h2></div>
+    <div class="rain">${summarizeRain(data.hours)}</div>
+    <div class="band"><h2>Ennuste</h2><span>Ilmatieteen laitos</span></div>`;
+
+  for (const day of days) {
+    const hs = day.hours;
+    const max = Math.max(...hs.map(h => h.Temperature));
+    const min = Math.min(...hs.map(h => h.Temperature));
+    const mm = hs.reduce((s, h) => s + (h.Precipitation1h || 0), 0);
+    const pops = hs.map(h => h.PoP).filter(p => !isNaN(p));
+    const pop = pops.length ? Math.round(Math.max(...pops)) : null;
+    const windiest = hs.reduce((a, b) => (b.WindSpeedMS > a.WindSpeedMS ? b : a));
+    // Representative symbol: hour nearest 14:00 (or the current hour if today is past that)
+    const isToday = day.key === dayKey(new Date());
+    const target = isToday && new Date().getHours() >= 14 ? cur :
+      hs.reduce((a, b) => (Math.abs(new Date(b.t).getHours() - 14) < Math.abs(new Date(a.t).getHours() - 14) ? b : a));
+    const symDate = new Date(target.t);
+    const label = WD[day.date.getDay()];
+
+    html += `
+    <section class="day${openKeys.has(day.key) ? ' open' : ''}" data-key="${day.key}">
+      <button class="dayrow" aria-expanded="${openKeys.has(day.key)}">
+        <div><div class="wd">${label}</div><div class="dt">${isToday ? 'tänään' : `${day.date.getDate()}.${day.date.getMonth() + 1}.`}</div></div>
+        <img src="${icon(target.WeatherSymbol3, symDate)}" alt="${desc(target.WeatherSymbol3)}">
+        <div class="temps"><span class="hi">${fmtT(max)}</span><span class="lo"><small>alin</small> ${fmtT(min)}</span></div>
+        <div class="pr">${pop !== null ? `💧 ${pop} %<br>` : ''}${fmtMm(mm)}</div>
+        ${windBadge(windiest.WindSpeedMS, windiest.WindDirection)}
+        <svg class="chev" viewBox="0 0 24 24"><path d="M5 9l7 7 7-7"/></svg>
+      </button>
+      <div class="hours">${hs.map(h => {
+        const d = new Date(h.t);
+        const past = h.t + 3600000 <= now;
+        const pp = isNaN(h.PoP) ? '' : `💧 ${Math.round(h.PoP)} % · `;
+        return `<div class="hour${past ? ' past' : ''}">
+          <div class="h">${pad(d.getHours())}.00</div>
+          <img src="${icon(h.WeatherSymbol3, d)}" alt="">
+          <div class="tt">${fmtT(h.Temperature)}${feels(h)}</div>
+          <div class="desc"><b>${desc(h.WeatherSymbol3)}</b><br>${pp}${fmtMm(h.Precipitation1h || 0)}</div>
+          ${windBadge(h.WindSpeedMS, h.WindDirection)}
+        </div>`;
+      }).join('')}</div>
+    </section>`;
+  }
+  app.innerHTML = html;
+}
+
+document.getElementById('app').addEventListener('click', e => {
+  const row = e.target.closest('.dayrow');
+  if (!row) return;
+  const day = row.parentElement;
+  day.classList.toggle('open');
+  row.setAttribute('aria-expanded', day.classList.contains('open'));
+  const open = [...document.querySelectorAll('.day.open')].map(d => d.dataset.key);
+  sessionStorage.setItem('saa_open', JSON.stringify(open));
+});
+
+async function load() {
+  const btn = document.getElementById('refresh');
+  btn.classList.add('spin');
+  try {
+    const data = await fetchForecast();
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (_) {}
+    render(data);
+  } catch (err) {
+    console.error(err);
+    if (!document.querySelector('.day')) {
+      document.getElementById('app').innerHTML = `<div class="err">Ennusteen haku epäonnistui (${err.message}). Yritä uudelleen ⟳</div>`;
+    } else {
+      document.getElementById('updated').textContent += ' · päivitys epäonnistui';
+    }
+  } finally {
+    btn.classList.remove('spin');
+  }
+}
+
+// Show the last forecast instantly, then refresh
+try {
+  const cached = JSON.parse(localStorage.getItem(CACHE_KEY));
+  if (cached && cached.hours?.length) render(cached);
+} catch (_) {}
+load();
+document.getElementById('refresh').addEventListener('click', load);
+// Refresh when the app comes back to the foreground after 15+ minutes
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  try {
+    const c = JSON.parse(localStorage.getItem(CACHE_KEY));
+    if (!c || Date.now() - c.fetched > 15 * 60000) load();
+  } catch (_) { load(); }
+});
+
+// ---------- Tabs ----------
+function showTab(tab) {
+  document.getElementById('view-saa').hidden = tab !== 'saa';
+  document.getElementById('view-radar').hidden = tab !== 'radar';
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  try { sessionStorage.setItem('saa_tab', tab); } catch (_) {}
+  if (tab === 'radar') openRadar(); else stopRadar();
+}
+document.querySelector('nav').addEventListener('click', e => {
+  const b = e.target.closest('button');
+  if (b) showTab(b.dataset.tab);
+});
+
+// ---------- Rain radar (FMI open WMS, composite reflectivity, 5-min frames) ----------
+const RADAR_LAYER = 'suomi_dbz_eureffin';
+const RADAR_WMS = 'https://openwms.fmi.fi/geoserver/Radar/wms';
+const RADAR_FRAMES = 13;  // last hour
+const STEP = 5 * 60000;
+let map = null, overlays = [], times = [], frame = 0, playTimer = null, radarFetched = 0;
+
+function loadLeaflet() {
+  if (window.L) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css';
+    document.head.appendChild(css);
+    const js = document.createElement('script');
+    js.src = 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js';
+    js.onload = resolve;
+    js.onerror = () => reject(new Error('Kartan lataus epäonnistui'));
+    document.head.appendChild(js);
+  });
+}
+
+// Newest frame time from the layer's own (small, ~8 KB) capabilities document
+async function latestRadarTime() {
+  try {
+    const res = await fetch(`https://openwms.fmi.fi/geoserver/Radar/${RADAR_LAYER}/wms?service=WMS&request=GetCapabilities&version=1.3.0`, { cache: 'no-store' });
+    const m = (await res.text()).match(/<Dimension name="time"[^>]*>[^<]*\/([^/<]+)\/PT5M/);
+    if (m) return new Date(m[1]);
+  } catch (_) {}
+  return new Date(Math.floor((Date.now() - 10 * 60000) / STEP) * STEP);
+}
+
+function frameUrl(time) {
+  const b = map.getBounds(), size = map.getSize();
+  const sw = L.CRS.EPSG3857.project(b.getSouthWest()), ne = L.CRS.EPSG3857.project(b.getNorthEast());
+  const k = Math.min(window.devicePixelRatio || 1, 2);
+  return `${RADAR_WMS}?service=WMS&version=1.3.0&request=GetMap&layers=Radar:${RADAR_LAYER}&styles=` +
+    `&format=image/png&transparent=true&crs=EPSG:3857&bbox=${sw.x},${sw.y},${ne.x},${ne.y}` +
+    `&width=${Math.round(size.x * k)}&height=${Math.round(size.y * k)}&time=${time.toISOString()}`;
+}
+
+// One image overlay per frame, all preloaded; switching frames just flips opacity
+function rebuildOverlays() {
+  overlays.forEach(o => map.removeLayer(o));
+  overlays = times.map(t => {
+    const o = L.imageOverlay(frameUrl(t), map.getBounds(), { opacity: 0, interactive: false });
+    o.bad = false;
+    o.on('error', () => { o.bad = true; });
+    return o.addTo(map);
+  });
+  showFrame(frame);
+}
+
+function showFrame(i) {
+  frame = i;
+  overlays.forEach((o, j) => o.setOpacity(j === i ? 0.8 : 0));
+  document.getElementById('rslider').value = i;
+  const t = times[i];
+  if (!t) return;
+  document.getElementById('rtime').textContent = `klo ${t.getHours()}.${pad(t.getMinutes())}`;
+  const ago = Math.round((Date.now() - t) / 60000);
+  document.getElementById('rago').textContent = ago <= 1 ? 'nyt' : `${ago} min sitten`;
+}
+
+function step() {
+  // Skip frames FMI couldn't serve (the archive has occasional gaps)
+  let next = frame;
+  for (let n = 0; n < times.length; n++) {
+    next = (next + 1) % times.length;
+    if (!overlays[next]?.bad) break;
+  }
+  showFrame(next);
+  // Linger on the newest frame before looping
+  playTimer = setTimeout(step, next === times.length - 1 ? 1800 : 450);
+}
+function play() {
+  if (playTimer) return;
+  document.getElementById('rplay').textContent = '❚❚';
+  playTimer = setTimeout(step, 450);
+}
+function stopRadar() {
+  clearTimeout(playTimer);
+  playTimer = null;
+  document.getElementById('rplay').textContent = '▶';
+}
+
+// Point nowcast for home: met.no radar-based, 5-min steps ~2 h ahead (no free nowcast MAP exists:
+// FMI doesn't publish one openly and RainViewer dropped its nowcast frames)
+async function loadNowcast() {
+  const box = document.getElementById('nowcast');
+  try {
+    const res = await fetch(`https://api.met.no/weatherapi/nowcast/2.0/complete?lat=${LAT}&lon=${LON}`, { cache: 'no-store' });
+    const d = await res.json();
+    if (d.properties.meta.radar_coverage !== 'ok') { box.hidden = true; return; }
+    const ts = d.properties.timeseries.map(t => ({ t: new Date(t.time), r: t.data.instant.details.precipitation_rate || 0 }));
+    const hhmm = t => `${t.getHours()}.${pad(t.getMinutes())}`;
+    const wet = r => r >= 0.1;
+    let msg;
+    if (!ts.some(x => wet(x.r))) msg = 'Ei sadetta seuraavan 2 tunnin aikana';
+    else if (wet(ts[0].r)) {
+      const stop = ts.find(x => !wet(x.r));
+      msg = stop ? `Sataa nyt, tauko n. klo ${hhmm(stop.t)}` : 'Sataa nyt, jatkuu yli 2 h';
+    } else msg = `Sade alkaa n. klo ${hhmm(ts.find(x => wet(x.r)).t)}`;
+    const max = Math.max(2, ...ts.map(x => x.r));
+    const end = ts[ts.length - 1].t;
+    box.innerHTML = `<div class="ttl"><b>${msg}</b><span>kotona</span></div>` +
+      (ts.some(x => wet(x.r)) ? `<div class="bars">${ts.map(x =>
+        `<div class="${wet(x.r) ? '' : 'zero'}" style="height:${Math.max(3, x.r / max * 100)}%" title="klo ${hhmm(x.t)}: ${x.r.toFixed(1)} mm/h"></div>`).join('')}</div>
+        <div class="ticks"><span>nyt</span><span>klo ${hhmm(new Date((+ts[0].t + +end) / 2))}</span><span>klo ${hhmm(end)}</span></div>` : '');
+    box.hidden = false;
+  } catch (_) {
+    box.hidden = true;
+  }
+}
+
+async function loadRadarFrames() {
+  loadNowcast();
+  const latest = await latestRadarTime();
+  times = Array.from({ length: RADAR_FRAMES }, (_, i) => new Date(latest - (RADAR_FRAMES - 1 - i) * STEP));
+  document.getElementById('rslider').max = times.length - 1;
+  frame = times.length - 1;
+  radarFetched = Date.now();
+  rebuildOverlays();
+}
+
+async function openRadar() {
+  try {
+    if (!map) {
+      await loadLeaflet();
+      map = L.map('map', { zoomControl: false }).setView([LAT, LON], 8);
+      const esri = 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_';
+      L.tileLayer(esri + 'Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 12, minZoom: 5,
+        attribution: 'Kartta © Esri · Tutka: Ilmatieteen laitos',
+      }).addTo(map);
+      // Place names above the radar so towns stay readable under heavy rain
+      map.createPane('labels').style.zIndex = 450;
+      map.getPane('labels').style.pointerEvents = 'none';
+      L.tileLayer(esri + 'Reference/MapServer/tile/{z}/{y}/{x}', { maxZoom: 12, minZoom: 5, pane: 'labels' }).addTo(map);
+      L.circleMarker([LAT, LON], { radius: 6, color: '#fff', weight: 2, fillColor: '#4fb3e0', fillOpacity: 1 }).addTo(map);
+      map.on('moveend', () => { if (times.length) rebuildOverlays(); });
+      await loadRadarFrames();
+    } else {
+      map.invalidateSize();
+      if (Date.now() - radarFetched > 5 * 60000) await loadRadarFrames();
+    }
+    play();
+  } catch (err) {
+    document.getElementById('rtime').textContent = err.message;
+  }
+}
+
+document.getElementById('rplay').addEventListener('click', () => (playTimer ? stopRadar() : play()));
+document.getElementById('rslider').addEventListener('input', e => { stopRadar(); showFrame(+e.target.value); });
+
+try { if (location.hash === '#tutka' || sessionStorage.getItem('saa_tab') === 'radar') showTab('radar'); } catch (_) {}
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>
