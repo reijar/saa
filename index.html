@@ -639,7 +639,9 @@ function pointInPolygon(lat, lon, poly) {
   }
   return inside;
 }
-const coversHere = w => w.areas.some(a => a.polygons.some(p => pointInPolygon(LAT, LON, p)));
+// Sea-area polygons are coarse and overlap the coast (Tapiola matched 5 sea warnings),
+// so marine warnings never count as "here"; they stay listed under Muualla.
+const coversHere = w => !/^sea/.test(w.type || '') && w.areas.some(a => a.polygons.some(p => pointInPolygon(LAT, LON, p)));
 const wColor = w => `var(--w-${WARN_RANK[w.color] ? w.color : 'yellow'})`;
 // "Keltainen tuulivaroitus maa-alueille: Kymenlaakso…, su 8.00 - ma 14.00" → title / areas
 const wTitle = w => (w.headline || w.event).split(':')[0];
