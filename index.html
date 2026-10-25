@@ -28,6 +28,7 @@
     padding: calc(14px + env(safe-area-inset-top)) 16px 12px; }
   header h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: .3px; }
   header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  header #coords { font-size: 12px; margin-top: 0; font-variant-numeric: tabular-nums; }
   header button { background: none; border: 0; color: var(--text); font-size: 22px;
     padding: 6px 8px; cursor: pointer; border-radius: 8px; }
   header button.spin { animation: spin 1s linear infinite; }
@@ -185,6 +186,7 @@
 <header>
   <button class="placebtn" id="placebtn" aria-label="Vaihda paikkaa">
     <h1><span id="place">Sää</span> <span class="caret">▾</span></h1>
+    <div class="sub" id="coords"></div>
     <div class="sub" id="updated">Haetaan ennustetta…</div>
   </button>
   <div class="hbtns">
@@ -357,6 +359,7 @@ function render(data) {
   document.getElementById('place').textContent = placeName;
   document.getElementById('warnplace').textContent = placeName;
   updateFavBtn();
+  document.getElementById('coords').textContent = `${LAT.toFixed(2)}, ${LON.toFixed(2)}`;
   const f = new Date(data.fetched);
   document.getElementById('updated').textContent =
     `Päivitetty ${f.getDate()}.${f.getMonth() + 1}. klo ${f.getHours()}.${pad(f.getMinutes())}`;
